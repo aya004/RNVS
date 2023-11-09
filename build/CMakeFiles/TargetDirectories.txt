@@ -1,0 +1,5 @@
+/home/tim/Documents/University/5.Semester/Rechnernetze/praktisch01/rn-praxis/build/CMakeFiles/webserver.dir
+/home/tim/Documents/University/5.Semester/Rechnernetze/praktisch01/rn-praxis/build/CMakeFiles/package.dir
+/home/tim/Documents/University/5.Semester/Rechnernetze/praktisch01/rn-praxis/build/CMakeFiles/package_source.dir
+/home/tim/Documents/University/5.Semester/Rechnernetze/praktisch01/rn-praxis/build/CMakeFiles/edit_cache.dir
+/home/tim/Documents/University/5.Semester/Rechnernetze/praktisch01/rn-praxis/build/CMakeFiles/rebuild_cache.dir
