@@ -46,6 +46,12 @@ int main(int argc, char *argv[]) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
+
+    int opt = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
     
     // bind socket
     if (bind(socket_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
@@ -65,9 +71,7 @@ int main(int argc, char *argv[]) {
 
     printf("Server listening on %s:%d\n", ip, port);
 
-    // Setting up buffer 
-    char buffer[BUFFER_SIZE];
-    int received_length = 0; // Wie viel im Puffer bereits gespeichert ist
+    
 
     while(1) {
         int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &client_len);
@@ -77,53 +81,75 @@ int main(int argc, char *argv[]) {
             continue;
         } else {
 
+            // Setting up buffer 
+            char buffer[BUFFER_SIZE];
+            int received_length = 0; // Wie viel im Puffer bereits gespeichert ist
 
-            // Read pakets 
-            // Empfangen von Daten und Hinzufügen zum Puffer
-            int length = read(client_fd, buffer + received_length, BUFFER_SIZE - received_length - 1);
-            if (length < 0) {
-                perror("Read failed");
-                continue;
-            }
-            received_length += length;
-            buffer[received_length] = '\0'; // Null-Terminator hinzufügen
-            printf(buffer);
-            
-            // Überprüfen, ob der Puffer das Ende der Nachricht enthält (\r\n\r\n)
-            char *end_of_message = strstr(buffer, "\r\n\r\n");
-            if (end_of_message != NULL) {
-                // Behandeln Sie die Anfrage hier
-                char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nReply\r\n\r\n";
-                //write(client_fd, response, strlen(response));
-                // wait till transmition is complete
-                ssize_t bytes_sent = write(client_fd, response, strlen(response));
-                if (bytes_sent < 0) {
-                    perror("Failed to send message");
-                } else {
-                    printf("Wrote %zd bytes to client!\n", bytes_sent);
+            // Buffer handling 
+            while (1) {
+                // check available buffer space 
+                if (BUFFER_SIZE - received_length -1 <= 0) {
+                    //TODO: handle buffer overflow (close connection)
+                    break;
                 }
-                // wait till transmition is complete
-                // Shutdown server side of the connection to send all data.
-                shutdown(client_fd, SHUT_WR);
-                printf("Wrote to client!\n");
-                
-                // Verschieben Sie alle unverarbeiteten Daten an den Anfang des Puffers
-                int remaining = received_length - (end_of_message - buffer + 4);
-                memmove(buffer, end_of_message + 4, remaining);
-                received_length = remaining;
+
+                // Read pakets 
+                // Empfangen von Daten und Hinzufügen zum Puffer
+                int length = read(client_fd, buffer + received_length, BUFFER_SIZE - received_length - 1);
+                if (length < 0) {
+                    perror("Read failed");
+                    continue;
+                } else if(length == 0) {
+                    // NO more data end of request 
+                    break;
+                }
+
+                received_length += length;
+                buffer[received_length] = '\0'; // Null-Terminator hinzufügen
+                printf("Buffer contents: \n");
+                printf(buffer);
+
+
+
+                // Überprüfen, ob der Puffer das Ende der Nachricht enthält (\r\n\r\n)
+                char *end_of_message = strstr(buffer, "\r\n\r\n");
+                if (end_of_message != NULL) {
+                    // Behandeln Sie die Anfrage hier
+                    char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nReply\r\n\r\n";
+                    //write(client_fd, response, strlen(response));
+                    // wait till transmition is complete
+                    ssize_t bytes_sent = write(client_fd, response, strlen(response));
+                    if (bytes_sent < 0) {
+                        perror("Failed to send message");
+                    } else {
+                        printf("Wrote %zd bytes to client!\n", bytes_sent);
+                    }
+                    // wait till transmition is complete
+                    // Shutdown server side of the connection to send all data.
+                    shutdown(client_fd, SHUT_WR);
+                    printf("Wrote to client!\n");
+                    
+                    // Verschieben Sie alle unverarbeiteten Daten an den Anfang des Puffers
+                    int remaining = received_length - (end_of_message - buffer + 4);
+                    memmove(buffer, end_of_message + 4, remaining);
+                    received_length = remaining;
+                }
+
+
             }
 
+            close(client_fd);
 
             // Wenn der Puffer voll ist und kein Ende der Nachricht gefunden wurde, 
             // haben Sie ein Problem, da Ihre Anfrage zu groß ist oder nicht korrekt beendet wird.
-            if (received_length == BUFFER_SIZE - 1) {
-                // Behandeln Sie diesen Fall, möglicherweise durch Schließen der Verbindung
-                break;
-            }
+            // if (received_length == BUFFER_SIZE - 1) {
+            //     // Behandeln Sie diesen Fall, möglicherweise durch Schließen der Verbindung
+            //     break;
+            // }
 
             
         }
-        close(client_fd);
+        
     }
     
     close(socket_fd);
