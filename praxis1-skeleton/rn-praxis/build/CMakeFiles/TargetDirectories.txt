@@ -1,0 +1,5 @@
+/tmp/RNVS/praxis1-skeleton/rn-praxis/build/CMakeFiles/webserver.dir
+/tmp/RNVS/praxis1-skeleton/rn-praxis/build/CMakeFiles/package.dir
+/tmp/RNVS/praxis1-skeleton/rn-praxis/build/CMakeFiles/package_source.dir
+/tmp/RNVS/praxis1-skeleton/rn-praxis/build/CMakeFiles/edit_cache.dir
+/tmp/RNVS/praxis1-skeleton/rn-praxis/build/CMakeFiles/rebuild_cache.dir
