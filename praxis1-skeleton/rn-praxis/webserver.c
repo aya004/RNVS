@@ -152,6 +152,7 @@ int main(int argc, char *argv[]){
                     }
                     else{
                         send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+
                     }
 
                 memset(buffer, 0, MAXLINE);
