@@ -116,6 +116,8 @@ int main(int argc, char *argv[]) {
                 if (end_of_message != NULL) {
                     // Behandeln Sie die Anfrage hier
                     char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nReply\r\n\r\n";
+                    //char *response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+
                     //write(client_fd, response, strlen(response));
                     // wait till transmition is complete
                     ssize_t bytes_sent = write(client_fd, response, strlen(response));
