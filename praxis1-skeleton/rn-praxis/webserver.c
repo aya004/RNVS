@@ -13,6 +13,10 @@
 
 #define MAXLINE  8192
 
+struct Response{
+    int statusCode;
+    char payload[256];
+};
 void error(char *msg){
     perror(msg);
     exit(1);
@@ -58,7 +62,7 @@ int main(int argc, char *argv[]){
     struct  sockaddr_storage client_addr;
     socklen_t client_addr_len;
     char *packet = calloc(MAXLINE + 1, sizeof(char));
-
+    char *test = calloc(MAXLINE + 1, sizeof(char));
     struct sockaddr_in server_addr;
     int yes = 1;
     int isHttp = 0;
@@ -109,12 +113,11 @@ int main(int argc, char *argv[]){
             continue;
         }
         if (!fork()) {
-            size_t method_len;
+            size_t uri_len, ver_len, buffer_len, header_len, method_len;
             char *method = calloc(method_len + 1, sizeof(char));
-            size_t uri_len;
-            char *uri;
-            size_t buffer_len;
-            size_t  header_len;
+            char *uri = calloc(uri_len + 1, sizeof(char));
+            char *header_name = calloc(256, sizeof(char));
+            char *header_value = calloc(256, sizeof(char));
 
             for(int i = 0; i < 100; i++){
                 recv_Bytes = recv(client_fd, buffer, MAXLINE, 0);
@@ -124,40 +127,118 @@ int main(int argc, char *argv[]){
                 }
                 if(recv_Bytes > 0){
                     strcat(packet, buffer);
+                    printf("%s\n",buffer);
+
+                    size_t request_len = strcspn(buffer, "\r\n");
+                    printf("%ld\n",request_len);
+                    method_len = strcspn(buffer, " ");
+
+
+                    if(method_len < request_len) { //there is method
+                        printf("%ld\n",method_len);
+                        memcpy(method, buffer, method_len);
+                        method[method_len] = '\0';
+                        buffer += method_len + 1;
+                        uri_len = strcspn(buffer, " ");
+                        if(uri_len < request_len){ //there is uri
+                            printf("%ld\n",uri_len);
+                            memcpy(uri, buffer, uri_len);
+                            uri[uri_len] = '\0';
+                            printf("%s\n",uri);
+                            buffer += uri_len + 1;
+                            ver_len = strcspn(buffer, "\r\n");
+                            if(ver_len < request_len){//there is version
+                                buffer += ver_len + 2;
+                                header_len = strcspn(buffer, "\r\n");
+                                if(header_len > 0){//there is header
+                                    for(int j = 0; j < 40; j++){
+                                        header_len = strcspn(buffer, "\r\n");
+                                        if(header_len > 0){
+                                            buffer += header_len + 2;
+                                        }else{
+                                            break;
+                                        }
+                                    }
+                                }
+                                if(buffer[0] == '\r' && buffer[1] == '\n'){//there is no header OR header is parsed
+                                    buffer += 2;
+                                    if(strncmp(uri, "/static/foo", strlen("/static/foo")) == 0){
+                                        send(client_fd, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n", strlen("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n"), 0);
+                                        send(client_fd, "Foo", strlen("Foo"), 0 );
+                                    }
+                                    if(strncmp(uri, "/static/bar", strlen("/static/bar")) == 0){
+                                        send(client_fd, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n", strlen("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n"), 0);
+                                        send(client_fd, "Bar", strlen("Bar"), 0 );
+                                    }
+                                    if(strncmp(uri, "/static/baz", strlen("/static/baz")) == 0){
+                                        send(client_fd, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n", strlen("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n"), 0);
+                                        send(client_fd, "Baz", strlen("Baz"), 0 );
+                                    }
+                                    else{
+                                        if(strncmp(method, "GET", strlen("GET")) == 0){//not static Content OR not bar, baz, foo
+                                            send(client_fd, "HTTP/1.1 404\r\nContent-Length: 0\r\n\r\n", strlen("HTTP/1.1 404\r\nContent-Length: 0\r\n\r\n"), 0);
+                                        }
+                                        else{
+                                            send(client_fd, "HTTP/1.1 501\r\n\r\n", status_len, 0);
+                                        }
+                                    }
+                                }
+                            } else {//there is no version
+                                send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+                            }
+                        } else { //there is no uri
+                            send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+                        }
+                    } else{ //there is no method
+                        send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+                    }
                 }
-                if(packet[0] == '\r' && packet[1] == '\n'){
+
+
+                /*if(packet[0] == '\r' && packet[1] == '\n'){
                     packet += 2;
                 }
                 method_len = strcspn(packet, " ");
                 size_t request_len = strcspn(packet, "\r\n");
 
-                    if(method_len < request_len){ //there is method
+                if(method_len < request_len){ //there is method
                         memcpy(method, packet, method_len);
                         method[method_len] = '\0';
                         packet += request_len + 2;
-                        if(packet[0] == '\r' && packet[1] == '\n'){
-                            send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+
+                        if(strlen(packet) == 2){ //Anfrage besteht nur aus Request
+                            packet += 2;
+                            if(strncmp(method, "GET", strlen("GET")) == 0){
+                                send(client_fd, "HTTP/1.1 404\r\n\r\n", status_len, 0);
+                            }
+                            else{
+                                send(client_fd, "HTTP/1.1 501\r\n\r\n", status_len, 0);
+                            }
                         }
-                        while(packet[0] != '\r' || packet[1] != '\n'){
+                        while(packet[0] != '\r' && packet[1] != '\n'){
                             header_len = strcspn(packet, "\r\n");
                             packet += header_len + 2;
                         }
-                        if(strncmp(method, "GET", strlen("GET")) == 0){
-                            send(client_fd, "HTTP/1.1 404\r\n\r\n", status_len, 0);
-
-                        }
-                        else{
-                            send(client_fd, "HTTP/1.1 501\r\n\r\n", status_len, 0);
+                        if(packet[0] == '\r' && packet[1] == '\n'){
+                            packet += 2;
+                            if(strncmp(method, "GET", strlen("GET")) == 0){
+                                send(client_fd, "HTTP/1.1 404\r\n\r\n", status_len, 0);
+                            }
+                            else{
+                                send(client_fd, "HTTP/1.1 501\r\n\r\n", status_len, 0);
+                            }
                         }
                     }
-                    else{
-                        send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
-
-                    }
-
+                    else{ //there is no method
+                        packet += request_len + 2;
+                        if(packet[0] == '\r' && packet[1] == '\n'){ //Anfrage besteht nur aus Request
+                            packet += 2;
+                            send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+                        }
+                    }*/
                 memset(buffer, 0, MAXLINE);
             }
-            printf("%s\n",packet);
+            printf("**%s\n",packet);
             close(client_fd);
             exit(0);
         }
