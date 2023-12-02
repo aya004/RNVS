@@ -113,11 +113,12 @@ int main(int argc, char *argv[]){
             continue;
         }
         if (!fork()) {
-            size_t uri_len, ver_len, buffer_len, header_len, method_len;
+            size_t uri_len, ver_len, buffer_len, header_len, method_len, header_name_len, header_value_len;
             char *method = calloc(method_len + 1, sizeof(char));
             char *uri = calloc(uri_len + 1, sizeof(char));
             char *header_name = calloc(256, sizeof(char));
             char *header_value = calloc(256, sizeof(char));
+            int not_valid = 0;
 
             for(int i = 0; i < 100; i++){
                 recv_Bytes = recv(client_fd, buffer, MAXLINE, 0);
@@ -154,13 +155,24 @@ int main(int argc, char *argv[]){
                                     for(int j = 0; j < 40; j++){
                                         header_len = strcspn(buffer, "\r\n");
                                         if(header_len > 0){
+                                            header_name_len = strcspn(buffer, " ");
+                                            header_value_len = strcspn(buffer, "\r\n");
+                                            if(header_name_len > header_len){
+                                                not_valid += 1;
+                                                printf("not valid %d\n", not_valid);
+                                            }
                                             buffer += header_len + 2;
-                                        }else{
+                                        }
+                                        else{
                                             break;
                                         }
                                     }
                                 }
-                                if(buffer[0] == '\r' && buffer[1] == '\n'){//there is no header OR header is parsed
+                                if(not_valid > 0){//not a header Semantic
+                                    buffer += 2;
+                                    send(client_fd, "HTTP/1.1 400\r\n\r\n", status_len, 0);
+                                }
+                                if(buffer[0] == '\r' && buffer[1] == '\n'){//there is no header OR there is a header Semantic
                                     buffer += 2;
                                     if(strncmp(uri, "/static/foo", strlen("/static/foo")) == 0){
                                         send(client_fd, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n", strlen("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n"), 0);
@@ -174,10 +186,12 @@ int main(int argc, char *argv[]){
                                         send(client_fd, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n", strlen("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\n\r\n"), 0);
                                         send(client_fd, "Baz", strlen("Baz"), 0 );
                                     }
+
                                     else{
                                         if(strncmp(method, "GET", strlen("GET")) == 0){//not static Content OR not bar, baz, foo
                                             send(client_fd, "HTTP/1.1 404\r\nContent-Length: 0\r\n\r\n", strlen("HTTP/1.1 404\r\nContent-Length: 0\r\n\r\n"), 0);
                                         }
+
                                         else{
                                             send(client_fd, "HTTP/1.1 501\r\n\r\n", status_len, 0);
                                         }
